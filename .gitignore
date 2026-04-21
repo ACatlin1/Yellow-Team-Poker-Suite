@@ -1,0 +1,21 @@
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Environments
+.env
+venv/
+env/
+
+# Databases and Local Saves
+*.db
+saves/
+*.pkl
+
+# playit.gg Binary
+playit*.exe
+playit
+
+# OS specific files
+.DS_Store
+Thumbs.db
