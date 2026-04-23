@@ -1,7 +1,8 @@
 from core.cards import Deck
 from core.players import Player
+from ui.manager import UIManager
 
-
+UIManager()
 
 # WIP test1
 deck = Deck()
