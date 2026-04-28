@@ -41,15 +41,21 @@ class SpriteManager:
     def get_card_image(self, card):
         # Builds full path to a card image and loads it
         base_dir = os.path.dirname(__file__)
-        path = os.path.join(base_dir, "assets", "cards", self.card_to_filename(card))
+        path = os.path.join(base_dir, "assets", "cards", "png", self.card_to_filename(card))
         return self.load_image(path)
 
     def get_card_back(self):
         # Loads the back-of-card image
         base_dir = os.path.dirname(__file__)
-        path = os.path.join(base_dir, "assets", "cards", "back.png")
+        path = os.path.join(base_dir, "assets", "cards", "png", "red_back.png")
         return self.load_image(path)
 
 
 # Global instance so the same cache is shared everywhere
 sprites = SpriteManager()
+
+
+"""
+All .png files come from 
+https://acbl.mybigcommerce.com/52-playing-cards/
+"""

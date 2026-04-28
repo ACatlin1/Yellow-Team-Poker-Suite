@@ -63,15 +63,34 @@ class LobbyScreen(tk.Frame):
         StyledButton(right_menu, "View Stats", self.view_stats).pack(pady=5)
         StyledButton(right_menu, "Exit", self.exit_app).pack(pady=5)
 
+        # ---------- GAME SETTINGS ----------
+        settings_frame = tk.Frame(self, bg="#0b3d0b")
+        settings_frame.pack(pady=20)
+
+        # Variant Selection
+        StyledLabel(settings_frame, "Game Variant:", size=12).grid(row=0, column=0, padx=10)
+        self.variant_var = tk.StringVar(value="Texas Hold'em")
+        variant_menu = tk.OptionMenu(self, self.variant_var, "Texas Hold'em", "5-Card Draw", "7-Card Stud")
+        variant_menu.config(bg="#2e7d32", fg="white", font=("Arial", 10, "bold"), width=15)
+        variant_menu.grid(row=0, column=1, padx=10, in_=settings_frame)
+
+        # Bot Count Selection
+        StyledLabel(settings_frame, "Bots:", size=12).grid(row=1, column=0, padx=10, pady=10)
+        self.bot_count_spin = tk.Spinbox(settings_frame, from_=1, to=5, width=5, font=("Arial", 12))
+        self.bot_count_spin.grid(row=1, column=1, padx=10)
+
+
     def confirm_username(self):
         # Save username from input field into StringVar
         self.username_value.set(self.username_entry.get())
         print(f"Username set to: {self.username_value.get()}")
 
     def singleplayer(self):
-        # Start game using entered username (fallback to "Player")
         name = self.username_value.get() or "Player"
-        self.start_callback(name)
+        variant = self.variant_var.get()
+        bot_count = int(self.bot_count_spin.get())
+        
+        self.start_callback(name, variant, bot_count)
 
     def multiplayer(self):
         # Placeholder for future multiplayer logic

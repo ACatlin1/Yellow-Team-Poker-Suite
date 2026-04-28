@@ -14,10 +14,12 @@ from ui.sprites import sprites
 
 
 class TableScreen(tk.Frame):
-    def __init__(self, master, exit_callback):
+    """Updated to accept the game state"""
+    def __init__(self, master, manager, exit_callback, game_state):
         super().__init__(master)
-
-        self.exit_callback = exit_callback  # store the function
+        self.manager = manager
+        self.exit_callback = exit_callback
+        self.state = game_state
 
         self.pack(fill="both", expand=True)
         self.configure(bg="#0b3d0b")
@@ -26,7 +28,7 @@ class TableScreen(tk.Frame):
         self.pot_amount = 0
 
         self.build()
-        self.test_layout()  # REMOVE LATER
+        
 
     def build(self):
         # ---------- TOP SECTION (POT DISPLAY) ----------
@@ -74,7 +76,7 @@ class TableScreen(tk.Frame):
         for w in self.opponents_frame.winfo_children():
             w.destroy()
 
-        self.card_images.clear()
+        #self.card_images.clear()
 
         # Render each opponent's hand
         for i, hand in enumerate(opponents):
@@ -82,13 +84,14 @@ class TableScreen(tk.Frame):
             pair_frame.grid(row=0, column=i, padx=40)
 
             for j, card in enumerate(hand):
-                img = sprites.get_card_image(card)
+                img = sprites.get_card_back()
                 if img:
                     # Resize image to fit UI
                     img = img.subsample(5, 5)
                     self.card_images.append(img)
 
                     label = tk.Label(pair_frame, image=img, bg="#0b3d0b")
+                    label.image = img
                 else:
                     # Fallback if image missing
                     label = tk.Label(pair_frame, text=str(card))
@@ -106,6 +109,7 @@ class TableScreen(tk.Frame):
                 img = img.subsample(5, 5)
                 self.card_images.append(img)
                 label = tk.Label(self.community_frame, image=img, bg="#0b3d0b")
+                label.image = img
             else:
                 label = tk.Label(self.community_frame, text=str(card))
 
@@ -122,6 +126,7 @@ class TableScreen(tk.Frame):
                 img = img.subsample(5, 5)
                 self.card_images.append(img)
                 label = tk.Label(self.player_frame, image=img, bg="#0b3d0b")
+                label.image = img
             else:
                 label = tk.Label(self.player_frame, text=str(card))
 
@@ -140,22 +145,33 @@ class TableScreen(tk.Frame):
             self.check_call_btn.config(text="Check")
 
     def check_call(self):
-        print("Check/Call")
+        self.manager.process_player_action({
+            "player_name": self.state.players[0].name,
+            "action": "call",
+             "amount": 0 
+             })
 
     def raise_bet(self):
-        print("Raise")
+        self.manager.process_player_action({
+            "player_name": self.state.players[0].name,
+            "action": "raise",
+             "amount": 50 })        # might need to make this a variable later ***********
 
     def fold(self):
-        print("Fold")
+        self.manager.process_player_action({
+            "player_name": self.state.players[0].name,
+            "action": "fold", 
+            "amount": 0
+            })
 
     def pause(self):
-        print("Pause")
+        self.master.process_player_action({"action": "pause", "player_name": self.state.players[0].name})
 
     def exit_game(self):
         # Switch back to the lobby screen
         self.exit_callback()
 
-    def test_layout(self):
+    """def test_layout(self):
         # Temporary method to populate UI with sample data
         from core.cards import Deck
 
@@ -168,4 +184,4 @@ class TableScreen(tk.Frame):
         self.render_community(deck.draw(5))
         self.render_player_hand(deck.draw(2))
 
-        self.update_pot(150)
+        self.update_pot(150)"""
