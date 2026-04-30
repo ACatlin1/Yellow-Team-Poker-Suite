@@ -8,75 +8,38 @@ the poker game type with community cards and river cards.
 **************************************************************************
 """
 
-from .base import PokerGame
+class TexasHoldem():
+    def __init__(self, players, deck, community_cards):
+        self.players = players
+        self.deck = deck
+        self.community_cards = community_cards
 
-class TexasHoldem(PokerGame):
+    def deal_cards(self):
+        """Standard Hold'em deal: 2 cards to each player."""
+        self.deal_initial_cards()
+
     def deal_initial_cards(self):
-        """Deal 2 hole cards face down to every player"""
         for p in self.players:
-            hole_card = self.deck.draw(2)
-            p.hand.add_cards(hole_card)
+            # Draw 2 cards from the deck
+            cards = self.deck.draw(2)
+            p.hand.add_cards(cards)
 
     def deal_community_cards(self, count: int):
-        """Draws cards from the deck, flips them, and adds to the public pool"""
         new_cards = self.deck.draw(count)
         for card in new_cards:
-            card.is_face_up = True  # Publicly visible
+            card.is_face_up = True
         self.community_cards.extend(new_cards)
 
+    def small_blind(self):
+        return 5
 
-    """
-    *****************************************************************
-    Running the game.
-    Im leaving both options for now until states are implemented.
-    Im unsure which version will be more appreciated.
-    *****************************************************************
-    """
+    def large_blind(self):
+        return 10
 
-    def play_round(self):
-        self.start_new_round()
-        self.deal_initial_cards()
-        self.small_blind()
-        self.large_blind()
-        self.user_choice()
-        self.is_betting_round_over()
-        self.deal_community_cards(3) #the flop
-        self.user_choice()
-        self.is_betting_round_over()
-        self.deal_community_cards(1) #the turn
-        self.user_choice()
-        self.is_betting_round_over()
-        self.deal_community_cards(1) #the river
-        self.user_choice()
-        self.is_betting_round_over()
-        self.determine_winner()
+    def determine_winner(self):
+        """This will be triggered by logic.handle_showdown."""
+        pass 
 
     def play_round(self):
-        """Phase 1: Setup"""
-        self.start_new_round()
-        self.small_blind()
-        self.large_blind()
-        self.deal_initial_cards()
-        
-        """Phase 2: First round of betting pre-flop"""
-        # The GUI will call user_choice() until is_betting_round_over() is True
-        self.user_choice()
-        self.is_betting_round_over()
-        self.deal_community_cards(3)
-        
-        """Phase 3: Second round of betting post-flop"""
-        self.user_choice()
-        self.is_betting_round_over()
-        self.deal_community_cards(1)
-
-        """Phase 4: Third round of betting post-turn"""
-        self.user_choice()
-        self.is_betting_round_over()
-        self.deal_community_cards(1)
-
-        """Phase 5: Fourth round of betting post-river"""
-        self.user_choice()
-        self.is_betting_round_over()
-
-        """Phase 6: Final Showdown"""
-        self.determine_winner()
+        """Required by ABC, but logic is handled by UIManager."""
+        pass

@@ -43,7 +43,7 @@ class Evaluator:
         # Check for Flush and Straight
         is_flush = len(set(suits)) == 1
         is_straight = (max(ranks) - min(ranks) == 4) and len(set(ranks)) == 5
-        is_royal = (max(ranks==14) - min(ranks) == 10) and len(set(ranks)) == 5
+        is_royal = set(ranks) == {10, 11, 12, 13, 14}
         
         # 1. Royal FLush
         if is_flush and is_royal:
@@ -86,4 +86,4 @@ class Evaluator:
             return (1, ranks)
         
         # 10. Default: High Card
-        return (1, ranks)
+        return (0, ranks)

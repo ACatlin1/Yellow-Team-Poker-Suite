@@ -7,16 +7,19 @@ the poker game type WITH card draw mechanics
 **************************************************************************
 """
 
-from .base import PokerGame
 
-class Draw(PokerGame):
+from core.players import Player
 
-    """
-    *****************************************************************
-    Custom dealing options for 7 card stud
-    *****************************************************************
-    """
-     
+class Draw():
+    def __init__(self, players, deck):
+        self.players = players
+        self.deck = deck
+
+    def deal_cards(self):
+        """Implementation of abstract method for initial deal."""
+        self.deal_initial_cards()
+
+   
     def deal_initial_cards(self):
         """Deal 5 hole cards face down to every player"""
         for p in self.players:
@@ -29,7 +32,7 @@ class Draw(PokerGame):
         Removes those cards and deals fresh ones.
         """
         if len(indices) > 3:
-            return False # Security check: Don't allow more than 3
+            return False # Don't allow more than 3
             
         # Remove the cards (High to Low index)
         for index in sorted(indices, reverse=True):
@@ -41,45 +44,16 @@ class Draw(PokerGame):
         
         return True
 
+    def small_blind(self):
+        return 5
 
-    """
-    *****************************************************************
-    Running the game.
-    Im leaving both options for now until states are implemented.
-    Im unsure which version will be more appreciated.
-    *****************************************************************
-    """
+    def large_blind(self):
+        return 10
 
-    def play_round(self):
-        self.start_new_round()
-        self.deal_initial_cards()
-        self.small_blind()
-        self.large_blind()
-        self.user_choice()
-        self.is_betting_round_over()
-        self.discard_and_draw()
-        self.user_choice()
-        self.is_betting_round_over()
-        self.determine_winner()
+    def determine_winner(self):
+        """This will be triggered by logic.handle_showdown."""
+        pass 
 
     def play_round(self):
-        """Phase 1: Setup"""
-        self.start_new_round()
-        self.small_blind()
-        self.large_blind()
-        self.deal_initial_cards()
-        
-        """Phase 2: First round of betting (Wait for GUI input)"""
-        # The GUI will call user_choice() until is_betting_round_over() is True
-        self.user_choice()
-        self.is_betting_round_over()
-        
-        """Phase 3: Draw phase"""
-        self.discard_and_draw() 
-
-        """Phase 4: Second round of betting"""
-        self.user_choice() 
-        self.is_betting_round_over
-
-        """Phase 5: Final Showdown"""
-        self.determine_winner()
+        """Required by ABC, but logic is handled by UIManager."""
+        pass

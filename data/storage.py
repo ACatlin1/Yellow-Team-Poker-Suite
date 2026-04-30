@@ -47,6 +47,8 @@ class GameState:
     deck: Deck = field(default_factory=Deck)                        # the active deck
     last_action: Optional[GameAction] = None                        # most recent action taken
     action_history: list[GameAction] = field(default_factory=list)  # full log of actions this round
+    actions_this_round: int = 0          # how many actions have occurred in this betting round
+    winner: Optional[str] = None         # name of the winner at showdown (if any)
 
     def to_json(self) -> str:
         """Converts the current state into a JSON string for networking.

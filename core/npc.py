@@ -9,7 +9,7 @@ creating virtual opponents for local play
 """
 
 
-from scoring import Evaluator
+from core.scoring import Evaluator
 from itertools import combinations
 
 class BotAI:
