@@ -10,14 +10,15 @@ the poker game type WITH card draw mechanics
 
 from core.players import Player
 
+
 class Draw():
     def __init__(self, players, deck):
         self.players = players
         self.deck = deck
 
-    def deal_cards(self):
-        """Implementation of abstract method for initial deal."""
-        self.deal_initial_cards()
+        self.small_blind = 10
+        self.large_blind = 20
+        self.variant_name = "5-Card Draw"
 
    
     def deal_initial_cards(self):
@@ -42,18 +43,3 @@ class Draw():
         new_cards = self.deck.draw(len(indices))
         player.hand.add_cards(new_cards)
         
-        return True
-
-    def small_blind(self):
-        return 5
-
-    def large_blind(self):
-        return 10
-
-    def determine_winner(self):
-        """This will be triggered by logic.handle_showdown."""
-        pass 
-
-    def play_round(self):
-        """Required by ABC, but logic is handled by UIManager."""
-        pass

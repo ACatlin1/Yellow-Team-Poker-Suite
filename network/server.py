@@ -12,8 +12,9 @@ Changed from ngrok to playit.gg for persistant urls
 
 import socket
 import threading
-from data.storage import GameState # access to dataclass
-
+import json
+from data.storage import GameState
+from core.logic import PokerGameLogic
 
 class PokerServer:
     def __init__(self, host='0.0.0.0', port=5555):
@@ -21,21 +22,25 @@ class PokerServer:
         self.server.bind((host, port))
         self.server.listen()
         
-        self.clients = []        # List of socket connections
+        self.clients = []        
         self.game_state = GameState()
         self.game_logic = PokerGameLogic(self.game_state)
-        print(f"Server started on {port}. Waiting for playit.gg traffic...")
+        print(f"Server started on port {port}. Waiting for players...")
 
-    def broadcast(self, message):
-        """Send a JSON string to every connected player."""
-        for client in self.clients:
-            try:
-                client.send(message.encode('utf-8'))
-            except:
-                self.clients.remove(client)
+    def broadcast(self):
+        """Send the current GameState JSON string to every connected player."""
+        try:
+            state_json = self.game_state.to_json()
+            for client in self.clients:
+                try:
+                    client.send(state_json.encode('utf-8'))
+                except:
+                    self.clients.remove(client)
+        except Exception as e:
+            print(f"JSON Serialization Error: {e}")
 
     def handle_client(self, conn, addr):
-        """Each player gets their own version of this function running in a thread."""
+        """Each player gets their own thread."""
         print(f"[NEW CONNECTION] {addr} connected.")
         self.clients.append(conn)
 
@@ -47,20 +52,27 @@ class PokerServer:
                 
                 action = json.loads(data)
 
-                # Update game logic
-                self.game_logic.process(action)
+                # 2. Check if this is a connection action or a game action
+                if action["action"] == "join":
+                    self.game_logic.add_player(action["player_name"], is_cpu=False)
+                    print(f"[Lobby] {action['player_name']} joined the game.")
+                else:
+                    self.game_logic.process(action)
                 
                 # 3. Tell everyone what happened
-                self.broadcast(self.game_state.to_json())
-            except:
+                self.broadcast()
+            except Exception as e:
+                print(f"Error with {addr}: {e}")
                 break
 
+        print(f"[DISCONNECTED] {addr}")
+        if conn in self.clients:
+            self.clients.remove(conn)
         conn.close()
 
     def run(self):
         while True:
             conn, addr = self.server.accept()
-            # Start a new thread so the server can go back to listening for more players
             thread = threading.Thread(target=self.handle_client, args=(conn, addr))
             thread.start()
 

@@ -9,12 +9,14 @@ controlling the GUI screens
 """
 
 import tkinter as tk
-import random
+#import random
 from data.storage import GameState
 from core.logic import PokerGameLogic
-from core.npc import BotAI
+from data.database import DatabaseManager
+from ui.auth import AuthScreen
 from ui.lobby import LobbyScreen
 from ui.table import TableScreen
+from ui.stats import StatsScreen
 
 
 class UIManager:
@@ -27,68 +29,178 @@ class UIManager:
         self.root.geometry("1000x700")
         self.root.resizable(False, False)
 
+        self.root.process_player_action = self.process_player_action
+
         # Keeps track of the currently active screen
         self.current_screen = None
+        self.db = DatabaseManager()
 
-        # Start with lobby screen
-        self.show_lobby()
+        self.root.show_stats = self.show_stats
 
-        # Begin Tkinter event loop
+        self.show_auth()
         self.root.mainloop()
+
 
     def clear(self):
         # Destroys current screen before switching to another
         if self.current_screen:
             self.current_screen.destroy()
 
+
+    def show_auth(self):
+        self.clear()
+        self.current_screen = AuthScreen(self.root, self.handle_login, self.handle_register, self.handle_guest)
+
+
+    def handle_login(self, username, password, status_label):
+        if self.db.verify_login(username, password):
+            self.username = username
+            self.show_lobby()
+        else:
+            status_label.config(text="Invalid username or password.")
+
+
+    def handle_register(self, username, password, status_label):
+        if len(username) < 5 or len(password) < 5:
+            status_label.config(text="Username and password must be 5+ characters.")
+            return
+
+        if self.db.register_player(username, password):
+            self.username = username
+            self.show_lobby()
+        else:
+            status_label.config(text="Username already exists.")
+
+
+    def handle_guest(self):
+        self.username = "Guest"
+        self.show_lobby()
+
+
     def show_lobby(self):
         # Displays lobby screen
         self.clear()
-        self.current_screen = LobbyScreen(self.root, self.start_game)
+        self.current_screen = LobbyScreen(
+            self.root, 
+            self.db,
+            self.username,
+            self.start_game)
+        
+        self.current_screen.pack(fill="both", expand=True)
 
-    def start_game(self, username, variant_name, bot_count):
-        """Updated to start a true intsnace of the game"""
-        print(f"Starting {variant_name} with {bot_count} bots for {username}")
 
-        # Create a fresh GameState
-        self.game_state = GameState()
+    def show_stats(self):
+        self.clear()
 
-        # Create the logic engine
-        self.logic = PokerGameLogic(self.game_state)
+        stats_data = self.db.get_player_stats(self.username)
+        if not stats_data:
+            # Mainly used for guest accounts
+            stats_data = {"username": self.username, "chips": 1000, "games_played": 0, "games_won": 0}
+        else:
+            # Get the user stats
+            stats_data["username"] = self.username
 
-        # Set the game variant
-        self.logic.set_variant(variant_name)
+        self.current_screen = StatsScreen(self.root, stats_data, self.show_lobby)
 
-        # Add the human player
-        self.logic.add_player(username, is_cpu=False)
 
-        # Add a bot opponents
-        for i in range(bot_count):
-            self.logic.add_player(f"CPU_{i+1}", chips=1000)
-            self.game_state.players[-1].is_cpu = True
+    def start_game(self, variant_name, bot_count, is_multiplayer=False, load_saved=False):
+        """Modified to support fresh starts and loading from DB"""
+        print(f"Starting {variant_name} (Load: {load_saved}) for {self.username}")
+        self.is_multiplayer = is_multiplayer
 
-        # Start the first hand
-        self.logic.set_variant(variant_name)
-        self.logic.start_hand()
+        if not self.is_multiplayer:
+            self.game_state = GameState()
+            self.logic = PokerGameLogic(self.game_state)
 
-        # Show the table screen
-        self.show_table()
+            if load_saved:
+                saved_state = self.db.get_saved_game(self.username)
+                if saved_state:
+                    self.game_state = saved_state
+                    self.logic = PokerGameLogic(self.game_state)
+                    self.logic.set_variant(self.game_state.variant_name)
+                    self.show_table()
+                    return
+                
+            else:
+                # Fresh start
+                self.logic.set_variant(variant_name)
+                self.logic.add_player(self.username, is_cpu=False)
+                for i in range(bot_count):
+                    self.logic.add_player(f"CPU_{i+1}", chips=1000, is_cpu=True)
+                
+                self.logic.start_hand()
 
-        # Render everything
-        self.refresh_ui()
+            self.show_table()
+            self.refresh_ui()
 
-        # Start action if a bot has the first move in a round
-        first_player = self.game_state.players[self.game_state.current_turn]
-        if first_player.is_cpu:
-            self.root.after(1500, self.trigger_bot_move)
+            # Handle the first turn
+            first_player = self.game_state.players[self.game_state.current_turn]
+            if first_player.is_cpu:
+                self.root.after(1500, self.trigger_bot_move)
+
+        else:
+            """Online Mode"""
+            from network.client import PokerClient
+            
+            # Initialize a blank state until the server sends the real one
+            self.game_state = GameState() 
+            self.show_table()
+
+            # Connect to the server
+            playit_url = "approve-ministries.with.playit.plus"
+            playit_port = 1093
+
+            self.network_client = PokerClient(playit_url, playit_port, self.on_network_update)
+            success = self.network_client.connect()
+
+            if success:
+                # Send a join request immediately
+                self.network_client.send_action({
+                    "action": "join",
+                    "player_name": self.username
+                })
+            else:
+                # Return to the lobby screen
+                print("Failed to connect to multiplayer. Returning to lobby.")
+                self.show_lobby()
 
 
     def show_table(self):
         """Updated to touch the game state"""
         # Displays main table screen
         self.clear()
-        self.current_screen = TableScreen(self.root, self, self.show_lobby, self.game_state)
+        self.current_screen = TableScreen(
+            self.root, 
+            self, 
+            self.show_lobby, 
+            self.game_state, 
+            self.username
+            )
+        
+        self.current_screen.pack(fill="both", expand=True)
 
+
+    def show_pause_menu(self):
+        """Creates a Toplevel popup to pause the game."""
+        pause_win = tk.Toplevel(self.root)
+        pause_win.title("Paused")
+        pause_win.geometry("300x250")
+        pause_win.configure(bg="#2c3e50")
+        
+        # Block interaction with the main window
+        pause_win.grab_set()
+
+        tk.Label(pause_win, text="GAME PAUSED", fg="white", bg="#2c3e50", 
+                 font=("Arial", 16, "bold")).pack(pady=20)
+
+        # Resume just kills the popup
+        tk.Button(pause_win, text="Resume", width=15, 
+                  command=pause_win.destroy).pack(pady=10)
+
+        # Save & Exit triggers the DB save and goes to lobby
+        tk.Button(pause_win, text="Save & Exit", width=15, 
+                  command=lambda: self.save_and_quit(pause_win)).pack(pady=10)
+        
 
     def refresh_ui(self):
         """Adding to clarify refreshing the visual updates"""
@@ -104,38 +216,66 @@ class UIManager:
         self.current_screen.render_community(self.game_state.community_cards)
 
         # Update Player Hand
-        # (Assuming the first player in the list is the human - I need to double check this *********)
-        human = self.game_state.players[0]
+        human = None
+        for p in self.game_state.players:
+            if p.name == self.username:
+                human = p
+                break
+                
+        # If the server hasn't added us to the state yet, pause the render
+        if not human:
+            return
         self.current_screen.render_player_hand(human.hand.cards)
-        to_call = self.game_state.current_bet_to_match - human.current_bet
-        self.current_screen.update_check_call(to_call)
+        
+        if self.game_state.phase == "draw":
+            if hasattr(self.current_screen, 'selected_discards') and len(self.current_screen.selected_discards) > 0:
+                self.current_screen.check_call_btn.config(text="Discard Selected")
+            else:
+                self.current_screen.check_call_btn.config(text="Stand Pat (Keep All)")
+                
+        elif self.game_state.phase == "showdown":
+            self.current_screen.check_call_btn.config(text="Next Hand")
+            
+        else:
+            to_call = self.game_state.current_bet_to_match - human.current_bet
+            self.current_screen.update_check_call(to_call)
 
         # Update Opponents
         # Get everyone EXCEPT the human player
-        opponents = [p.hand.cards for p in self.game_state.players[1:]]
+        opponents = [p.hand.cards for p in self.game_state.players if p.name != self.username]
         self.current_screen.render_opponents(opponents)
 
         if self.game_state.phase == "showdown":
             self.current_screen.check_call_btn.config(text="Next Hand")
+        
+        elif self.game_state.phase == "draw":
+            if hasattr(self.current_screen, 'selected_discards') and len(self.current_screen.selected_discards) > 0:
+                self.current_screen.check_call_btn.config(text="Discard Selected")
+            else:
+                self.current_screen.check_call_btn.config(text="Stand Pat (Keep All)")
     
 
     def trigger_bot_move(self):
         
-        # Block bot actions during showdown
-        if self.game_state.phase == "showdown":
+        if self.game_state.phase in ["showdown", "end"]:
             return
+        
+        active_player = self.game_state.players[self.game_state.current_turn]
+
+        if active_player.name == self.username or not active_player.is_cpu:
+            return  
 
         bot_action = self.logic.take_bot_action()
 
         if bot_action:
+            self.logic.process(bot_action)
             self.refresh_ui()
 
             # Only trigger next bot if turn actually changed
             next_player = self.game_state.players[self.game_state.current_turn]
 
-            if next_player.is_cpu and not next_player.is_folded:
+            if next_player.is_cpu and self.game_state.phase not in ["showdown", "end"]:
                 self.root.after(1500, self.trigger_bot_move)
-
 
 
     """def take_bot_action(self):
@@ -171,72 +311,109 @@ class UIManager:
             }
 
         return action"""
-    
-    def process_player_action(self, action_dict):
-        """Translate UI actions into logic.py actions."""
 
-        if self.game_state.phase == "showdown":
-            self.logic.start_hand()
-            self.refresh_ui()
-            
-            # If a bot is supposed to act first in the new hand, start it
-            first_player = self.game_state.players[self.game_state.current_turn]
-            if first_player.is_cpu:
-                self.root.after(1500, self.trigger_bot_move)
-            return
+
+    def process_player_action(self, action_dict):
         
-        # Guard added to prevent butotn pushing when it's not your turn
-        if self.game_state.current_turn != 0:
+        #****************************************************************
+        #Debug statement
+        print(f"UI Button Clicked: {action_dict}")
+        #****************************************************************
+
+        # Identify the Human Player
+        human = None
+        for p in self.game_state.players:
+            if p.name == self.username:
+                human = p
+                break
+        if not human:
+            return
+
+        action = action_dict.get("action", "")
+
+        if action == "pause":
+            print("[UI] Game Paused")
+            self.show_pause_menu()
+            return
+
+        # Automatically push Next Round clicks through if the round ends early
+        if self.game_state.phase in ["showdown", "end"] or action in ["next_round", "next_hand", "new_hand"]:
+            if self.is_multiplayer:
+                self.network_client.send_action({"action": "next_hand"})
+            else:
+                self.logic.start_hand()
+                self.refresh_ui()
+                
+                # Check if the bot happens to be the dealer/first-actor on the new hand
+                first_player = self.game_state.players[self.game_state.current_turn]
+                if first_player.name != self.username and first_player.is_cpu:
+                    self.root.after(1500, self.trigger_bot_move)
+            return
+
+        # Stop any actions outside of players turn
+        active_player = self.game_state.players[self.game_state.current_turn]
+        if active_player.name != self.username:
             print("Please wait, it is not your turn!")
             return
 
-        player = self.game_state.players[0]
-        to_call = self.game_state.current_bet_to_match - player.current_bet
-
-        action = action_dict["action"]
-        player = self.game_state.players[0]
-        to_call = self.game_state.current_bet_to_match - player.current_bet
-
-        action = action_dict["action"]
-
-        # Translate UI actions → logic actions
-        if action == "check":
+        # Translate UI actions to Logic actions
+        to_call = self.game_state.current_bet_to_match - human.current_bet
+        
+        if self.game_state.phase == "draw":
+            discard_indices = list(self.current_screen.selected_discards)
             translated = {
-                "player_name": player.name,
-                "action": "bet",
-                "amount": 0
+                "player_name": human.name,
+                "action": "discard",
+                "indices": discard_indices
             }
-
+        elif action == "check":
+            translated = { "player_name": human.name, 
+                          "action": "bet", 
+                          "amount": 0 }
         elif action == "call":
-            translated = {
-                "player_name": player.name,
-                "action": "bet",
-                "amount": max(to_call, 0)
-            }
-
+            translated = { "player_name": human.name, 
+                          "action": "bet", 
+                          "amount": max(to_call, 0) }
         elif action == "raise":
-            translated = {
-                "player_name": player.name,
-                "action": "bet",
-                "amount": to_call + action_dict.get("amount", 50)
-            }
-
+            translated = { "player_name": human.name, 
+                          "action": "bet", 
+                          "amount": to_call + action_dict.get("amount", 50) }
         elif action == "fold":
-            translated = {
-                "player_name": player.name,
-                "action": "fold",
-                "amount": 0
-            }
-
+            translated = { "player_name": human.name, 
+                          "action": "fold", 
+                          "amount": 0 }
         else:
-            print("Unknown UI action:", action)
+            print(f"Unknown UI action: {action}")
             return
 
-        # Process through logic engine
-        self.logic.process(translated)
-        self.refresh_ui()
+        # Route the translated action
+        if self.is_multiplayer:
+            self.network_client.send_action(translated)
+        else:
+            self.logic.process(translated)
+            self.refresh_ui()
 
-        # If next player is a bot, trigger bot move
-        next_player = self.game_state.players[self.game_state.current_turn]
-        if next_player.is_cpu:
-            self.root.after(1500, self.trigger_bot_move)
+            # Trigger bot ONLY if the hand is still actively playing
+            next_player = self.game_state.players[self.game_state.current_turn]
+            if next_player.is_cpu and self.game_state.phase not in ["showdown", "end"]:
+                self.root.after(1500, self.trigger_bot_move)
+
+
+    def on_network_update(self, json_string):
+
+        """Called by the client.py background thread when the server broadcasts."""
+        # Read the JSON string back into a GameState object
+        self.game_state = GameState.from_json(json_string)
+        
+        # Tell Tkinter's main thread to refresh the screen
+        self.root.after(0, self.refresh_ui)
+
+
+    def save_and_quit(self, popup):
+        """Serializes the current GameState and saves to DB."""
+       # Save to  DatabaseManager
+        self.db.save_game_state(self.username, self.game_state)
+        
+        popup.destroy()
+        self.show_lobby()
+        

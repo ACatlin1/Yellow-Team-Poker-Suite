@@ -9,7 +9,7 @@ scoring resolution logic
 """
 
 
-# Struct will scoring hands, ranked in order
+# Struct will help in scoring hands, ranked in order
 scoring_ranks = {
     "High Card": 1,
     "Pair": 2,
@@ -24,8 +24,8 @@ scoring_ranks = {
 }
 
 
-
 from collections import Counter
+from itertools import combinations
 
 class Evaluator:
     @staticmethod
@@ -87,3 +87,12 @@ class Evaluator:
         
         # 10. Default: High Card
         return (0, ranks)
+    
+# Determine the winner
+def best_five(cards):
+    best = None
+    for combo in combinations(cards, 5):
+        score = Evaluator.get_score(combo)
+        if best == None or score > best:
+            best = score
+    return best

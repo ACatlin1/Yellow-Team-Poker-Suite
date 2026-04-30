@@ -11,23 +11,52 @@ But JSON worked better for server communication.
 **************************************************************************
 """
 
+
 import os
 import pickle
+import json
+import importlib
 from dataclasses import dataclass, field
 from typing import Optional
 from core.cards import Deck
-import json
-from dataclasses import asdict
+
+
+class CustomStateEncoder(json.JSONEncoder):
+    """Dynamically converts custom Python objects into dictionaries."""
+    def default(self, obj):
+        if hasattr(obj, "__dict__"):
+            d = obj.__dict__.copy()
+            d["__class__"] = obj.__class__.__name__
+            d["__module__"] = obj.__class__.__module__
+            return d
+        return super().default(obj)
+
+
+def custom_state_decoder(d):
+    """Dynamically rebuilds Python objects from the JSON dictionaries."""
+    if "__class__" in d and "__module__" in d:
+        try:
+            module = importlib.import_module(d["__module__"])
+            class_ = getattr(module, d["__class__"])
+            
+            # Recreate the object while bypassing the __init__ method
+            obj = class_.__new__(class_)
+            for key, value in d.items():
+                if key not in ("__class__", "__module__"):
+                    setattr(obj, key, value)
+            return obj
+        except Exception as e:
+            print(f"Decode error: {e}")
+    return d
+
 
 @dataclass
 class GameAction:
-   
     player_name: str
     action: str   
     amount: int = 0  
 
     def __str__(self):
-        
         if self.amount:
             return f"{self.player_name} {self.action} {self.amount}"
         return f"{self.player_name} {self.action}"
@@ -35,31 +64,31 @@ class GameAction:
 
 @dataclass
 class GameState:
-   
     game_type: str = "Texas Holdem"
-    phase: str = "pre-flop"             # current phase: pre-flop, flop, turn, river, showdown
-    pot: int = 0                        # total chips in the pot
-    current_turn: int = 0               # index of the player whose turn it is
-    dealer_position: int = 0            # index of the current dealer
-    current_bet_to_match: int = 0       # the highest bet players must match to stay in
-    community_cards: list = field(default_factory=list)             # shared cards on the table
-    players: list = field(default_factory=list)                     # list of Player objects
-    deck: Deck = field(default_factory=Deck)                        # the active deck
-    last_action: Optional[GameAction] = None                        # most recent action taken
-    action_history: list[GameAction] = field(default_factory=list)  # full log of actions this round
-    actions_this_round: int = 0          # how many actions have occurred in this betting round
-    winner: Optional[str] = None         # name of the winner at showdown (if any)
+    variant_name: str = "Texas Holdem"
+    phase: str = "pre-flop"
+    pot: int = 0
+    current_turn: int = 0
+    dealer_position: int = 0
+    current_bet_to_match: int = 0
+    community_cards: list = field(default_factory=list)
+    players: list = field(default_factory=list)
+    deck: Deck = field(default_factory=Deck)
+    last_action: Optional[GameAction] = None
+    action_history: list[GameAction] = field(default_factory=list)
+    actions_this_round: int = 0
+    winner: Optional[str] = None
+
 
     def to_json(self) -> str:
-        """Converts the current state into a JSON string for networking.
-            asdict converts the dataclass and nested objects into a dict"""
-        return json.dumps(asdict(self))
+        """Converts the current state into a JSON string using the custom encoder."""
+        return json.dumps(self, cls=CustomStateEncoder)
+
 
     @classmethod
     def from_json(cls, json_str: str):
         """Creates a GameState object from a received JSON string."""
-        data = json.loads(json_str)
-        return cls(**data)
+        return json.loads(json_str, object_hook=custom_state_decoder)
 
 
 class SaveManager:
@@ -67,11 +96,13 @@ class SaveManager:
     SAVE_DIR = "saves"
     MAX_SLOTS = 3
 
+
     def save(self, state: GameState, slot: int) -> None:
         
         path = self._slot_path(slot)
         with open(path, "wb") as f:
             pickle.dump(state, f)
+
 
     def load(self, slot: int) -> GameState:
         
@@ -81,18 +112,22 @@ class SaveManager:
         with open(path, "rb") as f:
             return pickle.load(f)
 
+
     def delete(self, slot: int) -> None:
         
         path = self._slot_path(slot)
         if os.path.exists(path):
             os.remove(path)
 
+
     def slot_exists(self, slot: int) -> bool:
         return os.path.exists(self._slot_path(slot))
+
 
     def get_slot_info(self) -> list[tuple[int, bool]]:
         [(1, True), (2, False), (3, True)]
         return [(s, self.slot_exists(s)) for s in range(1, self.MAX_SLOTS + 1)]
+
 
     def _slot_path(self, slot: int) -> str:
         

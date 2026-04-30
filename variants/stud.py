@@ -13,9 +13,10 @@ class Stud():
         self.players = players
         self.deck = deck
 
-    def deal_cards(self):
-        """Standard Stud deal: 2 cards down, 1 face up to each player."""
-        self.deal_initial_cards()
+        self.small_blind = 10
+        self.large_blind = 20
+        self.variant_name = "7-Card Draw"
+
 
     def deal_initial_cards(self):
         for p in self.players:
@@ -27,16 +28,15 @@ class Stud():
             door_card[0].is_face_up = True
             p.hand.add_cards(door_card)
 
-    def small_blind(self):
-        return 5
 
-    def large_blind(self):
-        return 10
+    def deal_street_card(self, face_up=True):
+        """Deals exactly one card to every active player during Streets 4-7."""
+        for p in self.players:
+            # Only deal cards to players who are still in the hand
+            if not p.is_folded:
+                card_list = self.deck.draw(1)
+                card_list[0].is_face_up = face_up
+                p.hand.add_cards(card_list)
 
-    def determine_winner(self):
-        """This will be triggered by logic.handle_showdown."""
-        pass 
-
-    def play_round(self):
         """Required by ABC, but logic is handled by UIManager."""
         pass

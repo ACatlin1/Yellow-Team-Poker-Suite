@@ -13,6 +13,7 @@ hand class
 from typing import List
 from core.cards import Card
 
+
 class Hand:
     """The cards held by a player."""
     def __init__(self):
@@ -35,9 +36,10 @@ class Hand:
     def __repr__(self):
         return ", ".join([str(c) for c in self.cards]) if self.cards else "Empty Hand"
 
+
 class Player:
     """
-    This container holds all the things the player needs to manage.
+    This container holds all the things the player needs to manage
     """
     def __init__(self, name: str, initial_chips: int = 1000, is_cpu: bool = False):
         self.name = name
@@ -45,7 +47,7 @@ class Player:
         self.chips = initial_chips
         self.is_cpu = is_cpu
         
-        # Track the current state for the current round
+        # Track the state for the current round
         self.current_bet = 0
         self.is_folded = False
         self.is_all_in = False

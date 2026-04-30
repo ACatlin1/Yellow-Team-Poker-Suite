@@ -19,3 +19,8 @@ playit
 # OS specific files
 .DS_Store
 Thumbs.db
+
+echo "__pycache__/" >> .gitignore
+echo "*.pyc" >> .gitignore
+
+git rm -r --cached "**/__pycache__"

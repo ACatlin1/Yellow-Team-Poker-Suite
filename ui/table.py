@@ -14,19 +14,16 @@ from ui.sprites import sprites
 
 
 class TableScreen(tk.Frame):
-    """Updated to accept the game state"""
-    def __init__(self, master, manager, exit_callback, game_state):
-        super().__init__(master)
+    # Slots: 1(self), 2(master), 3(manager), 4(lobby_callback), 5(state), 6(username)
+    def __init__(self, master, manager, lobby_callback, state, username):
+        super().__init__(master, bg="#0b3d0b")
+        self.master = master
         self.manager = manager
-        self.exit_callback = exit_callback
-        self.state = game_state
-
-        self.pack(fill="both", expand=True)
-        self.configure(bg="#0b3d0b")
-
+        self.lobby_callback = lobby_callback
+        self.state = state
+        self.username = username
+        
         self.card_images = []
-        self.pot_amount = 0
-
         self.build()
         
 
@@ -35,8 +32,8 @@ class TableScreen(tk.Frame):
         top = tk.Frame(self, bg="#0b3d0b")
         top.pack(pady=10)
 
-        self.pot_label = StyledLabel(top, f"Pot: ${self.pot_amount}", size=16, bold=True)
-        self.pot_label.pack()
+        self.pot_label = StyledLabel(top, f"Pot: ${self.state.pot}", size=16, bold=True)
+        self.pot_label.pack(pady=10)
 
         # ---------- OPPONENT AREA ----------
         self.opponents_frame = tk.Frame(self, bg="#0b3d0b")
@@ -71,6 +68,7 @@ class TableScreen(tk.Frame):
         StyledButton(self.menu_frame, "Pause", self.pause).pack(pady=5)
         StyledButton(self.menu_frame, "Exit", self.exit_game).pack(pady=5)
 
+
     def render_opponents(self, opponents):
         # Clear previous opponent widgets
         for w in self.opponents_frame.winfo_children():
@@ -84,7 +82,11 @@ class TableScreen(tk.Frame):
             pair_frame.grid(row=0, column=i, padx=40)
 
             for j, card in enumerate(hand):
-                img = sprites.get_card_back()
+                if getattr(card, 'is_face_up', False):
+                    img = sprites.get_card_image(card)
+                else:
+                    img = sprites.get_card_back()
+
                 if img:
                     # Resize image to fit UI
                     img = img.subsample(5, 5)
@@ -97,6 +99,7 @@ class TableScreen(tk.Frame):
                     label = tk.Label(pair_frame, text=str(card))
 
                 label.grid(row=0, column=j, padx=2)
+
 
     def render_community(self, cards):
         # Clear previous cards
@@ -115,27 +118,64 @@ class TableScreen(tk.Frame):
 
             label.grid(row=0, column=i, padx=5)
 
+
     def render_player_hand(self, cards):
         # Clear previous hand
         for w in self.player_frame.winfo_children():
             w.destroy()
+
+        self.player_card_labels = []
+
+        if not hasattr(self, 'selected_discards') or self.state.phase != "draw":
+            self.selected_discards = set()
 
         for i, card in enumerate(cards):
             img = sprites.get_card_image(card)
             if img:
                 img = img.subsample(5, 5)
                 self.card_images.append(img)
-                label = tk.Label(self.player_frame, image=img, bg="#0b3d0b")
+                bg_color = "red" if i in self.selected_discards else "#0b3d0b"
+                label = tk.Label(self.player_frame, image=img, bg=bg_color, bd=2)
                 label.image = img
             else:
-                label = tk.Label(self.player_frame, text=str(card))
+                label = tk.Label(self.player_frame, text=str(card), bg="#0b3d0b", bd=2)
 
             label.grid(row=0, column=i, padx=5)
+
+            label.bind("<Button-1>", lambda event, idx=i: self.toggle_discard(idx))
+            self.player_card_labels.append(label)
+    
+
+    def toggle_discard(self, index):
+        # Only allow selecting cards by clicking during the draw phase
+        if self.state.phase != "draw":
+            return
+
+        if index in self.selected_discards:
+            # Deselect the card
+            self.selected_discards.remove(index)
+            self.player_card_labels[index].config(bg="#0b3d0b") # Reset to table color
+        else:
+            # Limit discards to 3 (matching the rules in draw.py)
+            if len(self.selected_discards) >= 3:
+                print("You can only discard up to 3 cards.")
+                return
+                
+            # Select the card
+            self.selected_discards.add(index)
+            self.player_card_labels[index].config(bg="red")
+
+        if len(self.selected_discards) > 0:
+            self.check_call_btn.config(text="Discard Selected")
+        else:
+            self.check_call_btn.config(text="Stand Pat (Keep All)")
+
 
     def update_pot(self, amount):
         # Updates pot value display
         self.pot_amount = amount
         self.pot_label.config(text=f"Pot: ${amount}")
+
 
     def update_check_call(self, to_call):
         # Dynamically switches button label based on game state
@@ -144,6 +184,7 @@ class TableScreen(tk.Frame):
         else:
             self.check_call_btn.config(text="Check")
 
+
     def check_call(self):
         self.manager.process_player_action({
             "player_name": self.state.players[0].name,
@@ -151,11 +192,13 @@ class TableScreen(tk.Frame):
              "amount": 0 
              })
 
+
     def raise_bet(self):
         self.manager.process_player_action({
             "player_name": self.state.players[0].name,
             "action": "raise",
              "amount": 50 })        # might need to make this a variable later ***********
+
 
     def fold(self):
         self.manager.process_player_action({
@@ -164,12 +207,18 @@ class TableScreen(tk.Frame):
             "amount": 0
             })
 
+
     def pause(self):
-        self.master.process_player_action({"action": "pause", "player_name": self.state.players[0].name})
+        self.master.process_player_action({
+            "action": "pause", 
+            "player_name": self.username
+            })
+
 
     def exit_game(self):
         # Switch back to the lobby screen
-        self.exit_callback()
+        self.lobby_callback()
+
 
     """def test_layout(self):
         # Temporary method to populate UI with sample data

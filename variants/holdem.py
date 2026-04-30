@@ -14,9 +14,9 @@ class TexasHoldem():
         self.deck = deck
         self.community_cards = community_cards
 
-    def deal_cards(self):
-        """Standard Hold'em deal: 2 cards to each player."""
-        self.deal_initial_cards()
+        self.small_blind = 10
+        self.large_blind = 20
+        self.variant_name = "Texas Hold'em"
 
     def deal_initial_cards(self):
         for p in self.players:
@@ -30,16 +30,3 @@ class TexasHoldem():
             card.is_face_up = True
         self.community_cards.extend(new_cards)
 
-    def small_blind(self):
-        return 5
-
-    def large_blind(self):
-        return 10
-
-    def determine_winner(self):
-        """This will be triggered by logic.handle_showdown."""
-        pass 
-
-    def play_round(self):
-        """Required by ABC, but logic is handled by UIManager."""
-        pass
