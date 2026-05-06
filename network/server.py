@@ -30,7 +30,7 @@ class PokerServer:
     def broadcast(self):
         """Send the current GameState JSON string to every connected player."""
         try:
-            state_json = self.game_state.to_json()
+            state_json = self.game_state.to_json() + "\n"
             for client in self.clients:
                 try:
                     client.send(state_json.encode('utf-8'))
@@ -46,20 +46,25 @@ class PokerServer:
 
         while True:
             try:
-                # 1. Receive JSON action from a player
+                # Receive JSON action from a player
                 data = conn.recv(2048).decode('utf-8')
                 if not data: break
                 
                 action = json.loads(data)
 
-                # 2. Check if this is a connection action or a game action
+                # Check if this is a connection action or a game action
                 if action["action"] == "join":
                     self.game_logic.add_player(action["player_name"], is_cpu=False)
                     print(f"[Lobby] {action['player_name']} joined the game.")
+                    if len(self.game_state.players) == 1:
+                        # Set this to whatever variant we are actively testing *******************
+                        self.game_logic.set_variant("5-Card Draw") 
+                        self.game_logic.start_hand()
+                        print("[Server] Game initialized and first hand started.")
                 else:
                     self.game_logic.process(action)
                 
-                # 3. Tell everyone what happened
+                # Tell everyone what happened
                 self.broadcast()
             except Exception as e:
                 print(f"Error with {addr}: {e}")

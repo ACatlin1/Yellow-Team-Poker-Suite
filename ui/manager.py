@@ -203,56 +203,35 @@ class UIManager:
         
 
     def refresh_ui(self):
-        """Adding to clarify refreshing the visual updates"""
-
-        # Block refresh if we're not on the right screen
         if not isinstance(self.current_screen, TableScreen):
             return
 
-        # Update Pot
+        # Always update pot
         self.current_screen.update_pot(self.game_state.pot)
 
-        # Update Community Cards
-        self.current_screen.render_community(self.game_state.community_cards)
-
-        # Update Player Hand
-        human = None
-        for p in self.game_state.players:
-            if p.name == self.username:
-                human = p
-                break
-                
-        # If the server hasn't added us to the state yet, pause the render
-        if not human:
-            return
-        self.current_screen.render_player_hand(human.hand.cards)
-        
-        if self.game_state.phase == "draw":
-            if hasattr(self.current_screen, 'selected_discards') and len(self.current_screen.selected_discards) > 0:
-                self.current_screen.check_call_btn.config(text="Discard Selected")
-            else:
-                self.current_screen.check_call_btn.config(text="Stand Pat (Keep All)")
-                
-        elif self.game_state.phase == "showdown":
-            self.current_screen.check_call_btn.config(text="Next Hand")
-            
-        else:
-            to_call = self.game_state.current_bet_to_match - human.current_bet
-            self.current_screen.update_check_call(to_call)
-
-        # Update Opponents
-        # Get everyone EXCEPT the human player
-        opponents = [p.hand.cards for p in self.game_state.players if p.name != self.username]
-        self.current_screen.render_opponents(opponents)
-
+        # Showdown - Next Hand button
         if self.game_state.phase == "showdown":
             self.current_screen.check_call_btn.config(text="Next Hand")
-        
-        elif self.game_state.phase == "draw":
-            if hasattr(self.current_screen, 'selected_discards') and len(self.current_screen.selected_discards) > 0:
-                self.current_screen.check_call_btn.config(text="Discard Selected")
-            else:
+            self.current_screen.refresh_ui()
+            return
+
+        # Draw phase - Update the check button
+        if self.game_state.phase == "draw":
+            # If no cards are selected yet, set the default text
+            if not hasattr(self.current_screen, 'selected_discards') or len(self.current_screen.selected_discards) == 0:
                 self.current_screen.check_call_btn.config(text="Stand Pat (Keep All)")
+            
+            self.current_screen.refresh_ui()
+            return
+
+        # Normal betting phases
+        human = next(p for p in self.game_state.players if p.name == self.username)
+        to_call = self.game_state.current_bet_to_match - human.current_bet
+        self.current_screen.update_check_call(to_call)
+
+        # Always refresh visuals
+        self.current_screen.refresh_ui()
+
     
 
     def trigger_bot_move(self):

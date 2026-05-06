@@ -26,6 +26,13 @@ class TableScreen(tk.Frame):
         self.card_images = []
         self.build()
         
+        # Dynamic fix for the cards going off screen
+        self.card_scale = 1.0
+        self.base_card_width = 100
+        self.base_card_height = 150
+
+        self.bind("<Configure>", lambda e: self.refresh_ui())
+
 
     def build(self):
         # ---------- TOP SECTION (POT DISPLAY) ----------
@@ -70,32 +77,33 @@ class TableScreen(tk.Frame):
 
 
     def render_opponents(self, opponents):
-        # Clear previous opponent widgets
         for w in self.opponents_frame.winfo_children():
             w.destroy()
 
-        #self.card_images.clear()
+        is_stud = (self.state.variant_name == "7-Card Stud")
 
-        # Render each opponent's hand
         for i, hand in enumerate(opponents):
             pair_frame = tk.Frame(self.opponents_frame, bg="#0b3d0b")
-            pair_frame.grid(row=0, column=i, padx=40)
+
+            if is_stud:
+                pair_frame.grid(row=i, column=0, pady=10)
+            else:
+                pair_frame.grid(row=0, column=i, padx=40)
 
             for j, card in enumerate(hand):
-                if getattr(card, 'is_face_up', False):
-                    img = sprites.get_card_image(card)
-                else:
-                    img = sprites.get_card_back()
+                img = sprites.get_card_image(card) if getattr(card, 'is_face_up', False) else sprites.get_card_back()
 
                 if img:
-                    # Resize image to fit UI
-                    img = img.subsample(5, 5)
-                    self.card_images.append(img)
+                    img = self.scale_image(img)
 
+                    # Shrink opponent cards to fit in Stud games
+                    if is_stud:
+                        img = img.subsample(2, 2)
+
+                    self.card_images.append(img)
                     label = tk.Label(pair_frame, image=img, bg="#0b3d0b")
                     label.image = img
                 else:
-                    # Fallback if image missing
                     label = tk.Label(pair_frame, text=str(card))
 
                 label.grid(row=0, column=j, padx=2)
@@ -109,7 +117,7 @@ class TableScreen(tk.Frame):
         for i, card in enumerate(cards):
             img = sprites.get_card_image(card)
             if img:
-                img = img.subsample(5, 5)
+                img = self.scale_image(img)
                 self.card_images.append(img)
                 label = tk.Label(self.community_frame, image=img, bg="#0b3d0b")
                 label.image = img
@@ -126,13 +134,34 @@ class TableScreen(tk.Frame):
 
         self.player_card_labels = []
 
+        #Added variation to the scaling for stud.
+        is_stud = (self.state.variant_name == "7-Card Stud")
+
+        if is_stud:
+            # Scale so 7 cards fit exactly in the available width
+            window_width = self.winfo_width()
+            card_width = 100 
+            spacing = 10
+
+            needed = 7 * (card_width + spacing)
+
+            # scale = how much we need to shrink to fit exactly
+            scale = window_width / needed
+
+            # Limit scale so cards stay readable
+            self.card_scale = max(0.7, min(scale, 1.0))
+        else:
+            # Normal dynamic scaling for other variants
+            self.card_scale = self.compute_tk_scale(len(cards))
+
+
         if not hasattr(self, 'selected_discards') or self.state.phase != "draw":
             self.selected_discards = set()
 
         for i, card in enumerate(cards):
             img = sprites.get_card_image(card)
             if img:
-                img = img.subsample(5, 5)
+                img = self.scale_image(img)
                 self.card_images.append(img)
                 bg_color = "red" if i in self.selected_discards else "#0b3d0b"
                 label = tk.Label(self.player_frame, image=img, bg=bg_color, bd=2)
@@ -218,6 +247,80 @@ class TableScreen(tk.Frame):
     def exit_game(self):
         # Switch back to the lobby screen
         self.lobby_callback()
+
+
+    # Moved refresh UI to this file to handle scaling
+    def refresh_ui(self):
+        # Player hand
+        player = self.state.players[0]
+        self.card_scale = self.compute_tk_scale(len(player.hand.cards))
+        self.render_player_hand(player.hand.cards)
+
+        # Community cards
+        self.card_scale = self.compute_tk_scale(len(self.state.community_cards))
+        self.render_community(self.state.community_cards)
+
+        # Opponents
+        opponents = [p.hand.cards for p in self.state.players[1:]]
+        max_cards = max((len(h) for h in opponents), default=0)
+        self.card_scale = self.compute_tk_scale(max_cards)
+        self.render_opponents(opponents)
+
+
+    # Helper function that finds how small cards need to be
+    def compute_tk_scale(self, num_cards):
+        """
+        I've come to learn that TKinter only scales with integers.
+        This is a helper solution to scaling within this framework.
+        """
+
+        window_width = self.winfo_width()
+        card_width = 10
+        spacing = 20
+
+        needed = num_cards * (card_width + spacing)
+
+        if needed <= window_width:
+            return 1.0
+
+        scale = window_width / needed
+
+        # Snap to Tkinter-friendly steps
+        if scale >= 0.75:
+            return 0.75
+        elif scale >= 0.5:
+            return 0.5
+        elif scale >= 0.33:
+            return 0.33
+        else:
+            return 0.25
+
+
+    # Helper function that scales the card images
+    def scale_image(self, img):
+
+        is_stud = (self.state.variant_name == "7-Card Stud")
+
+        if is_stud:
+            # Smaller base size for 7-card stud
+            base = img.subsample(10, 10)
+        else:
+            # Normal size for other games
+            base = img.subsample(6, 6)
+
+        scale = self.card_scale
+
+        # Standard scaling for other games
+        if scale == 1.0:
+            return base
+        elif scale == 0.75:
+            return base.subsample(4, 3)
+        elif scale == 0.5:
+            return base.subsample(2, 2)
+        elif scale == 0.33:
+            return base.subsample(3, 3)
+        else:  # 0.25
+            return base.subsample(4, 4)
 
 
     """def test_layout(self):

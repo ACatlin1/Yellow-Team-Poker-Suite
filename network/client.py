@@ -37,14 +37,21 @@ class PokerClient:
 
     def listen_thread(self):
         """Continuously listens for GameState JSON from the server."""
+        socket_file = self.client.makefile('r', encoding='utf-8')
+
         while self.connected:
             try:
-                # 8192 buffer size to ensure we catch the whole game state string
-                data = self.client.recv(8192).decode('utf-8')
+                # read a single line at a time
+                data = socket_file.readline()
                 if data:
-                    self.on_update_callback(data)
+                    self.on_update_callback(data.strip())
+                else:
+                    # If readline returns an empty string, the connection was closed
+                    print("Connection closed by server. Empty string")
+                    self.connected = False
+                    break
             except:
-                print("Disconnected from server.")
+                print("Disconnected from server: {e}")
                 self.connected = False
                 break
 
