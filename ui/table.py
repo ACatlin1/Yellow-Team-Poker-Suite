@@ -251,6 +251,10 @@ class TableScreen(tk.Frame):
 
     # Moved refresh UI to this file to handle scaling
     def refresh_ui(self):
+        # pause for second play to join
+        if not self.state.players:
+            return
+
         # Player hand
         player = self.state.players[0]
         self.card_scale = self.compute_tk_scale(len(player.hand.cards))

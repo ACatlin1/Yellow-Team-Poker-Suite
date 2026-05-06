@@ -56,11 +56,16 @@ class PokerServer:
                 if action["action"] == "join":
                     self.game_logic.add_player(action["player_name"], is_cpu=False)
                     print(f"[Lobby] {action['player_name']} joined the game.")
+                    
+                    # If this is the first player, just set the rules and wait
                     if len(self.game_state.players) == 1:
-                        # Set this to whatever variant we are actively testing *******************
-                        self.game_logic.set_variant("5-Card Draw") 
+                        self.game_logic.set_variant("Texas Hold'em") 
+                        print("[Server] Host joined. Waiting for opponents...")
+                    
+                    # Once a second player joins, deal!
+                    elif len(self.game_state.players) == 2:
                         self.game_logic.start_hand()
-                        print("[Server] Game initialized and first hand started.")
+                        print("[Server] Second player joined. Starting hand!")
                 else:
                     self.game_logic.process(action)
                 
