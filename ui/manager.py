@@ -384,6 +384,10 @@ class UIManager:
         # Read the JSON string back into a GameState object
         self.game_state = GameState.from_json(json_string)
         
+        # Pass a new state to start the game
+        if hasattr(self.current_screen, 'state'):
+            self.current_screen.state = self.game_state
+
         # Tell Tkinter's main thread to refresh the screen
         self.root.after(0, self.refresh_ui)
 
