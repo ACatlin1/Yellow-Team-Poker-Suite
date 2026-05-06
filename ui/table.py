@@ -264,17 +264,26 @@ class TableScreen(tk.Frame):
         if not self.state.players:
             return
 
-        # Player hand
-        player = self.state.players[0]
-        self.card_scale = self.compute_tk_scale(len(player.hand.cards))
-        self.render_player_hand(player.hand.cards)
+        human = None
+        for p in self.state.players:
+            if p.name == self.username:
+                human = p
+                break
+                
+        # If the player hasn't been fully added to the server yet, wait.
+        if not human:
+            return
+
+        # Player hand - dynamically tracks 1st person POV cards
+        self.card_scale = self.compute_tk_scale(len(human.hand.cards))
+        self.render_player_hand(human.hand.cards)
 
         # Community cards
         self.card_scale = self.compute_tk_scale(len(self.state.community_cards))
         self.render_community(self.state.community_cards)
 
-        # Opponents
-        opponents = [p.hand.cards for p in self.state.players[1:]]
+        # Opponents - dynamically tracks everyone who ISN'T user
+        opponents = [p.hand.cards for p in self.state.players if p.name != self.username]
         max_cards = max((len(h) for h in opponents), default=0)
         self.card_scale = self.compute_tk_scale(max_cards)
         self.render_opponents(opponents)

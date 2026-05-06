@@ -43,6 +43,7 @@ class PokerServer:
         """Each player gets their own thread."""
         print(f"[NEW CONNECTION] {addr} connected.")
         self.clients.append(conn)
+        player_name = None
 
         while True:
             try:
@@ -78,6 +79,12 @@ class PokerServer:
         print(f"[DISCONNECTED] {addr}")
         if conn in self.clients:
             self.clients.remove(conn)
+
+        if player_name:
+            self.game_state.players = [p for p in self.game_state.players if p.name != player_name]
+            print(f"[Server] Removed ghost player: {player_name}")
+            self.broadcast()
+            
         conn.close()
 
     def run(self):
