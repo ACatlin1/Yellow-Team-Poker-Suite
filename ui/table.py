@@ -215,23 +215,32 @@ class TableScreen(tk.Frame):
 
 
     def check_call(self):
+        if not self.state.players:
+            return
+        
         self.manager.process_player_action({
-            "player_name": self.state.players[0].name,
+            "player_name": self.username,
             "action": "call",
              "amount": 0 
              })
 
 
     def raise_bet(self):
+        if not self.state.players:
+            return
+        
         self.manager.process_player_action({
-            "player_name": self.state.players[0].name,
+            "player_name": self.username,
             "action": "raise",
              "amount": 50 })        # might need to make this a variable later ***********
 
 
     def fold(self):
+        if not self.state.players:
+            return
+        
         self.manager.process_player_action({
-            "player_name": self.state.players[0].name,
+            "player_name": self.username,
             "action": "fold", 
             "amount": 0
             })
