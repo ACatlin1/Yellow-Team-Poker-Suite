@@ -225,11 +225,12 @@ class UIManager:
             return
 
         # Normal betting phases
-        human = next(p for p in self.game_state.players if p.name == self.username)
-        to_call = self.game_state.current_bet_to_match - human.current_bet
-        self.current_screen.update_check_call(to_call)
+        human = next((p for p in self.game_state.players if p.name == self.username), None)
+        if human:
+            to_call = self.game_state.current_bet_to_match - human.current_bet
+            self.current_screen.update_check_call(to_call)
 
-        # Always refresh visuals
+        # Refresh visuals
         self.current_screen.refresh_ui()
 
     
@@ -378,18 +379,27 @@ class UIManager:
                 self.root.after(1500, self.trigger_bot_move)
 
 
+    # Wait for players to join then make a new state
     def on_network_update(self, json_string):
 
         """Called by the client.py background thread when the server broadcasts."""
         # Read the JSON string back into a GameState object
-        self.game_state = GameState.from_json(json_string)
+        new_state = GameState.from_json(json_string)
         
-        # Pass a new state to start the game
+        # Have the UI update
+        self.root.after(0, self.apply_network_update, new_state)
+
+
+    # Use the new state to update the table screen
+    def apply_network_update(self, new_state):
+        """Safely runs on the main thread to prevent Tkinter from freezing."""
+        self.game_state = new_state
+        
+        # Pass the brand-new state down to the active TableScreen
         if hasattr(self.current_screen, 'state'):
             self.current_screen.state = self.game_state
-
-        # Tell Tkinter's main thread to refresh the screen
-        self.root.after(0, self.refresh_ui)
+            
+        self.refresh_ui()
 
 
     def save_and_quit(self, popup):
