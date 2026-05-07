@@ -87,7 +87,7 @@ class LobbyScreen(tk.Frame):
 
         # Bot Count Selection
         StyledLabel(settings_frame, "Bots:", size=12).grid(row=1, column=0, padx=10, pady=10)
-        self.bot_count_spin = tk.Spinbox(settings_frame, from_=1, to=5, width=5, font=("Arial", 12))
+        self.bot_count_spin = tk.Spinbox(settings_frame, from_=1, to=3, width=5, font=("Arial", 12))
         self.bot_count_spin.grid(row=1, column=1, padx=10)
 
 
